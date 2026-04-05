@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Payment Manager Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, getDocs,
+  deleteDoc, doc, updateDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+window.firebaseModules = {
+  initializeApp,
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+  updateDoc
+};
+</script>
+
+<!-- Excel + PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+<style>
+body { font-family: Arial; margin: 20px; background: #f5f5f5; }
+.topbar { background: black; color: white; padding: 12px; text-align: center; font-size: 22px; border-radius: 8px; }
+form { text-align:center; }
+input, select { padding:8px; margin:5px; }
+button { padding:8px 12px; margin:5px; background:black; color:white; border:none; border-radius:5px; }
+table { width:100%; margin-top:20px; border-collapse: collapse; background:white; }
+th, td { border:1px solid #ccc; padding:8px; text-align:center; }
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+Total Pending Amount: ₹ <span id="pendingTotal">0</span>
+</div>
+
+<h2>Payment Manager Pro (Firebase)</h2>
+
+<form id="form">
+<input type="date" id="date" required>
+<input type="text" id="customer" placeholder="Customer Name" required>
+<input type="text" id="salesperson" placeholder="Salesperson Name" required>
+<input type="text" id="bank" placeholder="Bank Name" required>
+<input type="text" id="entry" placeholder="Bank Entry" required>
+<input type="number" id="amount" placeholder="Amount" required>
+
+<select id="status">
+<option value="pending">Pending</option>
+<option value="done">Done</option>
+</select>
+
+<button type="submit">Save</button>
+</form>
+
+<div style="text-align:center;">
+<button onclick="downloadExcel()">Download Excel</button>
+<button onclick="downloadPDF()">Download PDF</button>
+</div>
+
+<table>
+<thead>
+<tr>
+<th>Date</th><th>Customer</th><th>Salesperson</th><th>Bank</th>
+<th>Entry</th><th>Amount</th><th>Status</th><th>Action</th>
+</tr>
+</thead>
+<tbody id="tableBody"></tbody>
+</table>
+
+<script type="module">
+
+// 🔥 PASTE YOUR FIREBASE CONFIG HERE
+const firebaseConfig = {
+  apiKey: "AIzaSyCB6p1Xl5kZ8EUAGgWKo8JkFek_ZFFWYAY",
+  authDomain: "payment-9ada0.firebaseapp.com",
+  projectId: "payment-9ada0",
+  storageBucket: "payment-9ada0.firebasestorage.app",
+  messagingSenderId: "524563450808",
+  appId: "1:524563450808:web:0a245860a65c3fc5b29d4d",
+  measurementId: "G-S95R9CXFTT"
+};
+
+const {
+  initializeApp,
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+  updateDoc
+} = window.firebaseModules;
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let data = [];
+let editId = null;
+
+// Load Data
+async function loadData(){
+    const snap = await getDocs(collection(db, "payments"));
+    data = [];
+    snap.forEach(d => data.push({ id: d.id, ...d.data() }));
+    updateUI();
+}
+
+// Calculate Pending Total
+function calculateTotal(){
+    return data.filter(d => d.status === "pending")
+               .reduce((sum, d) => sum + d.amount, 0);
+}
+
+// Update UI
+function updateUI(){
+    const table = document.getElementById("tableBody");
+    table.innerHTML = "";
+
+    data.forEach(item => {
+        table.innerHTML += `
+        <tr>
+            <td>${item.date}</td>
+            <td>${item.customer}</td>
+            <td>${item.salesperson}</td>
+            <td>${item.bank}</td>
+            <td>${item.entry}</td>
+            <td>₹${item.amount}</td>
+            <td>${item.status}</td>
+            <td>
+                <button onclick="edit('${item.id}')">Edit</button>
+                <button onclick="remove('${item.id}')">Delete</button>
+            </td>
+        </tr>`;
+    });
+
+    document.getElementById("pendingTotal").innerText = calculateTotal();
+}
+
+// Add / Update
+document.getElementById("form").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+
+    const entry = {
+        date: date.value,
+        customer: customer.value,
+        salesperson: salesperson.value,
+        bank: bank.value,
+        entry: entryField.value,
+        amount: Number(amount.value),
+        status: status.value
+    };
+
+    if(editId){
+        await updateDoc(doc(db, "payments", editId), entry);
+        editId = null;
+    } else {
+        await addDoc(collection(db, "payments"), entry);
+    }
+
+    e.target.reset();
+    loadData();
+});
+
+// Edit
+window.edit = (id)=>{
+    const item = data.find(d => d.id === id);
+
+    date.value = item.date;
+    customer.value = item.customer;
+    salesperson.value = item.salesperson;
+    bank.value = item.bank;
+    entryField.value = item.entry;
+    amount.value = item.amount;
+    status.value = item.status;
+
+    editId = id;
+};
+
+// Delete
+window.remove = async (id)=>{
+    await deleteDoc(doc(db, "payments", id));
+    loadData();
+};
+
+const entryField = document.getElementById("entry");
+
+// Excel
+window.downloadExcel = function(){
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Payments");
+    XLSX.writeFile(wb, "payments.xlsx");
+};
+
+// PDF (Table)
+window.downloadPDF = function(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const rows = data.map(d => [
+        d.date, d.customer, d.salesperson,
+        d.bank, d.entry, "₹"+d.amount, d.status.toUpperCase()
+    ]);
+
+    doc.autoTable({
+        head: [["Date","Customer","Salesperson","Bank","Entry","Amount","Status"]],
+        body: rows
+    });
+
+    doc.save("payments.pdf");
+};
+
+// Initial Load
+loadData();
+
+</script>
+
+</body>
+</html>
