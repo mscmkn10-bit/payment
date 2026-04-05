@@ -2,28 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Payment Manager Pro</title>
+<title>Payment Manager (Firebase)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<!-- Firebase -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-  getFirestore, collection, addDoc, getDocs,
-  deleteDoc, doc, updateDoc
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-window.firebaseModules = {
-  initializeApp,
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc,
-  doc,
-  updateDoc
-};
-</script>
 
 <!-- Excel + PDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -35,7 +15,7 @@ body { font-family: Arial; margin: 20px; background: #f5f5f5; }
 .topbar { background: black; color: white; padding: 12px; text-align: center; font-size: 22px; border-radius: 8px; }
 form { text-align:center; }
 input, select { padding:8px; margin:5px; }
-button { padding:8px 12px; margin:5px; background:black; color:white; border:none; border-radius:5px; }
+button { padding:8px 12px; margin:5px; background:black; color:white; border:none; border-radius:5px; cursor:pointer; }
 table { width:100%; margin-top:20px; border-collapse: collapse; background:white; }
 th, td { border:1px solid #ccc; padding:8px; text-align:center; }
 </style>
@@ -47,7 +27,7 @@ th, td { border:1px solid #ccc; padding:8px; text-align:center; }
 Total Pending Amount: ₹ <span id="pendingTotal">0</span>
 </div>
 
-<h2>Payment Manager Pro (Firebase)</h2>
+<h2>Payment Manager (Firebase)</h2>
 
 <form id="form">
 <input type="date" id="date" required>
@@ -66,8 +46,8 @@ Total Pending Amount: ₹ <span id="pendingTotal">0</span>
 </form>
 
 <div style="text-align:center;">
-<button onclick="downloadExcel()">Download Excel</button>
-<button onclick="downloadPDF()">Download PDF</button>
+<button onclick="downloadExcel()">Excel</button>
+<button onclick="downloadPDF()">PDF</button>
 </div>
 
 <table>
@@ -80,9 +60,16 @@ Total Pending Amount: ₹ <span id="pendingTotal">0</span>
 <tbody id="tableBody"></tbody>
 </table>
 
+<!-- ✅ Firebase Script -->
 <script type="module">
 
-// 🔥 PASTE YOUR FIREBASE CONFIG HERE
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, getDocs,
+  deleteDoc, doc, updateDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ✅ YOUR CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyCB6p1Xl5kZ8EUAGgWKo8JkFek_ZFFWYAY",
   authDomain: "payment-9ada0.firebaseapp.com",
@@ -92,17 +79,6 @@ const firebaseConfig = {
   appId: "1:524563450808:web:0a245860a65c3fc5b29d4d",
   measurementId: "G-S95R9CXFTT"
 };
-
-const {
-  initializeApp,
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc,
-  doc,
-  updateDoc
-} = window.firebaseModules;
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -118,13 +94,13 @@ async function loadData(){
     updateUI();
 }
 
-// Calculate Pending Total
+// Calculate Pending
 function calculateTotal(){
     return data.filter(d => d.status === "pending")
                .reduce((sum, d) => sum + d.amount, 0);
 }
 
-// Update UI
+// UI Update
 function updateUI(){
     const table = document.getElementById("tableBody");
     table.innerHTML = "";
@@ -149,42 +125,48 @@ function updateUI(){
     document.getElementById("pendingTotal").innerText = calculateTotal();
 }
 
-// Add / Update
+// Save
 document.getElementById("form").addEventListener("submit", async (e)=>{
     e.preventDefault();
 
     const entry = {
-        date: date.value,
-        customer: customer.value,
-        salesperson: salesperson.value,
-        bank: bank.value,
-        entry: entryField.value,
-        amount: Number(amount.value),
-        status: status.value
+        date: document.getElementById("date").value,
+        customer: document.getElementById("customer").value,
+        salesperson: document.getElementById("salesperson").value,
+        bank: document.getElementById("bank").value,
+        entry: document.getElementById("entry").value,
+        amount: Number(document.getElementById("amount").value),
+        status: document.getElementById("status").value
     };
 
-    if(editId){
-        await updateDoc(doc(db, "payments", editId), entry);
-        editId = null;
-    } else {
-        await addDoc(collection(db, "payments"), entry);
-    }
+    try {
+        if(editId){
+            await updateDoc(doc(db, "payments", editId), entry);
+            editId = null;
+        } else {
+            await addDoc(collection(db, "payments"), entry);
+        }
 
-    e.target.reset();
-    loadData();
+        e.target.reset();
+        loadData();
+
+    } catch (err) {
+        console.error(err);
+        alert("Error saving data. Check console.");
+    }
 });
 
 // Edit
 window.edit = (id)=>{
     const item = data.find(d => d.id === id);
 
-    date.value = item.date;
-    customer.value = item.customer;
-    salesperson.value = item.salesperson;
-    bank.value = item.bank;
-    entryField.value = item.entry;
-    amount.value = item.amount;
-    status.value = item.status;
+    document.getElementById("date").value = item.date;
+    document.getElementById("customer").value = item.customer;
+    document.getElementById("salesperson").value = item.salesperson;
+    document.getElementById("bank").value = item.bank;
+    document.getElementById("entry").value = item.entry;
+    document.getElementById("amount").value = item.amount;
+    document.getElementById("status").value = item.status;
 
     editId = id;
 };
@@ -195,8 +177,6 @@ window.remove = async (id)=>{
     loadData();
 };
 
-const entryField = document.getElementById("entry");
-
 // Excel
 window.downloadExcel = function(){
     const ws = XLSX.utils.json_to_sheet(data);
@@ -205,14 +185,14 @@ window.downloadExcel = function(){
     XLSX.writeFile(wb, "payments.xlsx");
 };
 
-// PDF (Table)
+// PDF
 window.downloadPDF = function(){
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
     const rows = data.map(d => [
         d.date, d.customer, d.salesperson,
-        d.bank, d.entry, "₹"+d.amount, d.status.toUpperCase()
+        d.bank, d.entry, "₹"+d.amount, d.status
     ]);
 
     doc.autoTable({
@@ -223,7 +203,7 @@ window.downloadPDF = function(){
     doc.save("payments.pdf");
 };
 
-// Initial Load
+// Start
 loadData();
 
 </script>
